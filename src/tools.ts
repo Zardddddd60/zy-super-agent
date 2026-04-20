@@ -19,19 +19,18 @@ export const weatherTool = tool({
   }),
   async execute({ city }) {
     const mockWeather: Record<string, string> = {
-      '北京': '晴，15-25°C，东南风 2 级',
-      '上海': '多云，18-22°C，西南风 3 级',
-      '深圳': '阵雨，22-28°C，南风 2 级',
+      北京: '晴，15-25°C，东南风 2 级',
+      上海: '多云，18-22°C，西南风 3 级',
+      深圳: '阵雨，22-28°C，南风 2 级',
     };
     return mockWeather[city] || `${city}：暂无数据`;
   },
 });
 
-
 type CalculatorInput = {
   expression: string;
 };
-  
+
 export const calculatorTool = tool({
   description: '计算数学表达式的结果。当用户提问涉及数学运算时使用',
   inputSchema: jsonSchema<CalculatorInput>({

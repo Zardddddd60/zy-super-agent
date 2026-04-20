@@ -1,10 +1,10 @@
-import { createOpenAI } from '@ai-sdk/openai';
 import { devToolsMiddleware } from '@ai-sdk/devtools';
-import { ModelMessage, wrapLanguageModel } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { type ModelMessage, wrapLanguageModel } from 'ai';
 import 'dotenv/config';
 import { createInterface } from 'node:readline';
-import { calculatorTool, weatherTool } from './tools';
 import { agentLoop } from './agent-loop';
+import { calculatorTool, weatherTool } from './tools';
 
 const qwen = createOpenAI({
   baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
@@ -47,7 +47,6 @@ function ask() {
     });
 
     await agentLoop(model, tools, messages, SYSTEM);
-    console.log(JSON.stringify(messages, null, 2));
     ask();
   });
 }
