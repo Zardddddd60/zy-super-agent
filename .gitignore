@@ -1,0 +1,3 @@
+.devtools/
+node_modules
+.env
