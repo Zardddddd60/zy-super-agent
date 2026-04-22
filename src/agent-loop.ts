@@ -2,10 +2,10 @@ import {
   type LanguageModel,
   type ModelMessage,
   streamText,
-  type Tool,
 } from 'ai';
 import { detect, recordCall, recordResult, resetHistory } from './loop-detection';
 import { calculateDelay, isRetryable, sleep } from './retry';
+import type { ToolRegistry } from './tool-registry';
 
 const MAX_STEPS = 15;
 const MAX_API_RETRIES = 3;
@@ -13,7 +13,7 @@ const TOKEN_BUDGET = 15000;
 
 export async function agentLoop(
   model: LanguageModel,
-  tools: Record<string, Tool>,
+  toolRegistry: ToolRegistry,
   messages: ModelMessage[],
   system: string,
 ) {
@@ -36,11 +36,13 @@ export async function agentLoop(
         const result = streamText({
           model,
           system,
-          tools,
+          tools: toolRegistry.toAISDKFormat(),
           messages,
           // 不自动重试
           maxRetries: 0,
-          onError: () => {},
+          onError: () => {
+            // console.log('onError>>>>', error.message);
+          },
         });
         for await (const part of result.fullStream) {
           switch (part.type) {
