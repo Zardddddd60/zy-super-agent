@@ -9,7 +9,7 @@ import type { ToolRegistry } from './tool-registry';
 
 const MAX_STEPS = 15;
 const MAX_API_RETRIES = 3;
-const TOKEN_BUDGET = 15000;
+const TOKEN_BUDGET = 150000;
 
 export async function agentLoop(
   model: LanguageModel,

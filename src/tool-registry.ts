@@ -1,8 +1,8 @@
 import { jsonSchema, type Tool, type JSONSchema7 } from 'ai';
+import { MCPClient } from './mcp-client';
 
 // 使用自定义的tool，而不是ai的Tool，
 // 包含了除了与模型交互的其他语义
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface ToolDefinition<ExecuteParams = any, ExecuteResult = any> {
   // vercel sdk 需要的，只关心跟模型的交互，
   // 不处理并发安全，结果截断，权限等等
@@ -24,11 +24,53 @@ export class ToolRegistry {
   private concurrentCount = 0;
   private exclusiveLock = false;
   private waitQueue: Array<() => void> = [];
+  private mcpClients: Array<MCPClient> = [];
 
   register(...tools: ToolDefinition[]) {
     for (const tool of tools) {
       this.tools.set(tool.name, tool);
     }
+  }
+
+  async registerMCPServer(serverName: string, client: MCPClient): Promise<string[]> {
+    // 在register的过程中connect，返回后server可用
+    await client.connect();
+    this.mcpClients.push(client);
+
+    const tools = await client.listTools();
+    const registered: string[] = [];
+
+    for (const tool of tools) {
+      const prefixedName = `mcp__${serverName}__${tool.name}`;
+      if (this.tools.has(prefixedName)) {
+        continue;
+      }
+
+      this.register({
+        name: prefixedName,
+        description: `[MCP:${serverName}] ${tool.description}`,
+        parameters: tool.inputSchema,
+        // 大部分mcp都是read操作
+        isConcurrencySafe: true,
+        isReadOnly: true,
+        maxResultChars: 3000,
+        // 每个 MCP 工具的 execute 函数就是一个闭包，调用时通过 JSON-RPC 转发给 Server。
+        execute: async (input: any) => {
+          return client.callTool(tool.name, input);
+        },
+      });
+
+      registered.push(prefixedName);
+    }
+
+    return registered;
+  }
+
+  async closeAllMCP() {
+    for (const client of this.mcpClients) {
+      await client.close();
+    }
+    this.mcpClients = [];
   }
 
   get(name: string) {

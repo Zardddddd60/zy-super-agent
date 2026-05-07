@@ -37,6 +37,7 @@ export default defineConfig(
           varsIgnorePattern: '^_',
         },
       ],
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 );

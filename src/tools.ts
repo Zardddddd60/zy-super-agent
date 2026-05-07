@@ -406,7 +406,6 @@ export const BashTool: ToolDefinition<BashInput, string> = {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
       return output || '(命令执行成功，无输出)';
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch(err: any) {
       const stderr = err.stderr || '';
       const stdout = err.stdout || '';
