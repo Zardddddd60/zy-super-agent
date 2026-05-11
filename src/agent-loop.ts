@@ -45,6 +45,7 @@ export async function agentLoop(
           },
         });
         for await (const part of result.fullStream) {
+          // console.log('>>>>>part type: ', part.type);
           switch (part.type) {
             case 'text-delta':
               process.stdout.write(part.text);
@@ -89,6 +90,7 @@ export async function agentLoop(
         // break调attempt的循环
         break;
       } catch (error) {
+        // console.log('>>>>>error:', error.message);
         if (attempt > MAX_API_RETRIES || !isRetryable(error)) {
           throw error;
         }

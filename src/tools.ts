@@ -1,9 +1,11 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import fg from 'fast-glob';
+import { execSync } from 'node:child_process';
+
+import { pickSearchTool, webFetchTool } from './search-tool';
 
 import type { ToolDefinition } from './tool-registry';
-import { execSync } from 'node:child_process';
 
 type WeatherInput = {
   city: string;
@@ -429,4 +431,6 @@ export const allTools: ToolDefinition[] = [
   globTool,
   grepTool,
   BashTool,
+  pickSearchTool(),
+  webFetchTool,
 ];
