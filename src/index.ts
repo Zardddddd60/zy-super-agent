@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline';
 
 import { agentLoop } from './agent-loop';
 import { allTools } from './tools';
-import { ToolRegistry } from './tool-registry';
+import { type ToolDefinition, ToolRegistry } from './tool-registry';
 import { MCPClient } from './mcp-client';
 
 import { type ModelMessage, wrapLanguageModel } from 'ai';
@@ -22,6 +22,41 @@ const model = wrapLanguageModel({
 
 const registry = new ToolRegistry();
 registry.register(...allTools);
+
+type ToolSearchInput = {
+  query: string;
+};
+
+const toolSearchTool: ToolDefinition<ToolSearchInput> = {
+  name: 'tool_search',
+  description: '获取延迟工具的完整定义。传入工具名（从系统提示的延迟工具列表中选取），返回该工具的完整参数 Schema',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: {
+        type: 'string',
+        description: '工具名，如 "mcp__github__list_issues"。支持逗号分隔多个工具名',
+      },
+    },
+    required: ['query'],
+    additionalProperties: false,
+  },
+  isConcurrencySafe: true,
+  isReadOnly: true,
+  execute: async ({ query }) => {
+    const results = registry.searchTools(query);
+    if (results.length === 0) {
+      return `没有找到匹配 "${query}" 的工具`;
+    }
+    return results.map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+    }));
+  },
+};
+
+registry.register(toolSearchTool);
 
 async function connectGithubMCP() {
   const githubToken = process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
@@ -49,8 +84,8 @@ async function connectGithubMCP() {
 async function main() {
   await connectGithubMCP();
 
-  console.log(`\n已注册 ${registry.getAll().length} 个工具：`);
-  for (const tool of registry.getAll()) {
+  console.log(`\n已注册 ${registry.getActiveTools().length} 个工具：`);
+  for (const tool of registry.getActiveTools()) {
     const isMCP = tool.name.startsWith('mcp__');
     const flags = [
       isMCP ? 'MCP' : '内置',
@@ -58,6 +93,8 @@ async function main() {
     ].join(', ');
     console.log(`  - ${tool.name}（${flags}）`);
   }
+
+  const deferredSummary = registry.getDeferredToolSummary();
 
   const messages: ModelMessage[] = [];
   const rl = createInterface({
@@ -67,10 +104,11 @@ async function main() {
   });
 
   const SYSTEM = `你是 Super Agent，一个有工具调用能力的 AI 助手。
-你有内置工具和 MCP 工具可用。MCP 工具以 mcp__ 开头，如 mcp__github__list_issues。
-需要查询 GitHub 信息时，使用 mcp__github__ 前缀的工具。
-需要操作本地文件时，使用内置工具。
-回答要简洁直接。`;
+你有内置工具和 MCP 工具可用。
+如果你需要的工具不在当前列表中，使用 tool_search 工具搜索可用工具。
+回答要简洁直接。${deferredSummary}`;
+
+  console.log(SYSTEM);
 
   function ask() {
     rl.question('\nYou: ', async (input) => {

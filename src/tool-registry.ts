@@ -15,6 +15,8 @@ export interface ToolDefinition<ExecuteParams = any, ExecuteResult = any> {
   isConcurrencySafe?: boolean;
   isReadOnly?: boolean;
   maxResultChars?: number;
+  shouldDefer?: boolean;
+  searchHint?: string;
 }
 
 const DEFAULT_MAX_RESULT_CHARS = 3000;
@@ -25,6 +27,8 @@ export class ToolRegistry {
   private exclusiveLock = false;
   private waitQueue: Array<() => void> = [];
   private mcpClients: Array<MCPClient> = [];
+  // 记录被tool_search发现的tool name
+  private discoveredTools: Set<string> = new Set();
 
   register(...tools: ToolDefinition[]) {
     for (const tool of tools) {
@@ -54,6 +58,9 @@ export class ToolRegistry {
         isConcurrencySafe: true,
         isReadOnly: true,
         maxResultChars: 3000,
+        // mcp工具自动defer
+        shouldDefer: true,
+        searchHint: `${serverName} ${tool.name} ${tool.description}`,
         // 每个 MCP 工具的 execute 函数就是一个闭包，调用时通过 JSON-RPC 转发给 Server。
         execute: async (input: any) => {
           return client.callTool(tool.name, input);
@@ -81,20 +88,41 @@ export class ToolRegistry {
     return Array.from(this.tools.values());
   }
 
+  public searchTools(query: string) {
+    const q = query.trim();
+    const names = q.includes(',')
+      ? q.split(',').map((toolName) => toolName.trim()).filter(Boolean)
+      : [q];
+
+    const results: ToolDefinition[] = [];
+    for (const name of names) {
+      // tool search使用精确匹配
+      const tool = this.tools.get(name);
+      if (tool && tool.name !== 'tool_search') {
+        results.push(tool!);
+        this.discoveredTools.add(tool?.name);
+      }
+    }
+    return results;
+  }
+
   /**
    * 把自定义的ToolDefinition转换成Vercel AI SDK的工具format
    * @returns AISDK format的Tool格式
    */
   toAISDKFormat() {
     const result: Record<string, Tool> = {};
-    for (const [name, toolDef] of this.tools) {
+    const activeTools = this.getActiveTools();
+
+    for (const toolDefinition of activeTools) {
       const {
+        name,
         maxResultChars,
         execute: executeFn,
         parameters,
         description,
         isConcurrencySafe = false,
-      } = toolDef;
+      } = toolDefinition;
 
       result[name] = {
         inputSchema: jsonSchema(parameters),
@@ -123,6 +151,26 @@ export class ToolRegistry {
     }
 
     return result;
+  }
+
+  getActiveTools() {
+    return this.getAll().filter(toolDefinition => {
+      return !(toolDefinition.shouldDefer && !this.discoveredTools.has(toolDefinition.name));
+    });
+  }
+
+  getDeferredToolSummary() {
+    const deferred = this.getActiveTools();
+    if (deferred.length === 0) {
+      return '';
+    }
+
+    const lines = deferred.map(toolDefinition => {
+      const hint = toolDefinition.searchHint ? ` - ${toolDefinition.searchHint}` : '';
+      return `  - ${toolDefinition.name}${hint}`;
+    });
+
+    return `\n以下工具可用，但需要先通过 tool_search 搜索获取完整定义：\n${lines.join('\n')}`;
   }
 
   private async acquireConcurrent() {
