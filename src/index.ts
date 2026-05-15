@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline';
 import { agentLoop } from './agent/loop';
 import { allTools } from './tools';
 import { MCPClient } from './tools/mcp-client';
+import { SessionStore } from './session/store';
 
 import { type ToolDefinition, ToolRegistry } from './tools/registry';
 import { type ModelMessage, wrapLanguageModel } from 'ai';
@@ -96,7 +97,19 @@ async function main() {
 
   const deferredSummary = registry.getDeferredToolSummary();
 
-  const messages: ModelMessage[] = [];
+  // const messages: ModelMessage[] = [];
+  const isContinue = process.argv.includes('--continue');
+  const sessionId = 'default';
+  const store = new SessionStore(sessionId);
+
+  let messages: ModelMessage[] = [];
+  if (isContinue && store.exists()) {
+    messages = store.load();
+    console.log(`[Session] 恢复会话，${messages.length} 条历史消息`);
+  } else {
+    console.log(`[Session] 新会话`);
+  }
+
   const rl = createInterface({
     // 本进程的stdin
     input: process.stdin,
@@ -120,11 +133,18 @@ async function main() {
         return;
       }
 
-      messages.push({
+      const userMessage: ModelMessage = {
         role: 'user',
         content: trimmed,
-      });
+      };
+      messages.push(userMessage);
+      store.append(userMessage);
+      const beforeLen = messages.length;
       await agentLoop(model, registry, messages, SYSTEM);
+
+      // 持久化本轮新增的消息（agent loop 会往 messages 里 push assistant/tool 消息）
+      const newMessages = messages.slice(beforeLen);
+      store.appendAll(newMessages);
       ask();
     });
   }
