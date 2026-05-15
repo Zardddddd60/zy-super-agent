@@ -1,5 +1,6 @@
 import TurndownService from 'turndown';
-import { type ToolDefinition } from './tool-registry';
+
+import { type ToolDefinition } from './registry';
 
 type SearchInput = {
   query: string;

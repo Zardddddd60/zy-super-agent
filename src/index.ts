@@ -3,11 +3,11 @@ import { createOpenAI } from '@ai-sdk/openai';
 import 'dotenv/config';
 import { createInterface } from 'node:readline';
 
-import { agentLoop } from './agent-loop';
+import { agentLoop } from './agent/loop';
 import { allTools } from './tools';
-import { type ToolDefinition, ToolRegistry } from './tool-registry';
-import { MCPClient } from './mcp-client';
+import { MCPClient } from './tools/mcp-client';
 
+import { type ToolDefinition, ToolRegistry } from './tools/registry';
 import { type ModelMessage, wrapLanguageModel } from 'ai';
 
 const qwen = createOpenAI({

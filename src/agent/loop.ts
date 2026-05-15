@@ -5,7 +5,8 @@ import {
 } from 'ai';
 import { detect, recordCall, recordResult, resetHistory } from './loop-detection';
 import { calculateDelay, isRetryable, sleep } from './retry';
-import type { ToolRegistry } from './tool-registry';
+
+import type { ToolRegistry } from '../tools/registry';
 
 const MAX_STEPS = 15;
 const MAX_API_RETRIES = 3;
